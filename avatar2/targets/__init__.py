@@ -5,3 +5,4 @@ from .gdb_target import *
 from .qemu_target import *
 from .panda_target import *
 from .unicorn_target import *
+from .inception_target import *
