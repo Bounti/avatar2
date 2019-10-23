@@ -74,14 +74,14 @@ class InceptionProtocol(object):
         returns: True on success, else False
         """
 
-        self._device = usb.core.find(idVendor=0x04b4,
-                idProduct=0x00f1)
-
-        self._device.reset();
+        self._device = usb.core.find(idVendor=self._device_vendor_id,
+                idProduct=self._device_product_id)
 
         if self._device is None:
             self.log.error('Failed to connect to Inception-debugger')
             raise ConnectionRefusedError("Inception-debugger is not connected")
+
+        self._device.reset();
 
         self._device.set_configuration()
 
