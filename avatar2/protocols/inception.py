@@ -92,6 +92,9 @@ class InceptionProtocol(object):
         # intf = cfg[(0,0)]
         intf = self._device[0][(0,0)]
 
+        if self._device.is_kernel_driver_active(0):
+          self._device.detach_kernel_driver(0)
+
         self._ep_out = usb.util.find_descriptor(intf, bEndpointAddress=0x01)
 
         self._ep_in_response = usb.util.find_descriptor(intf, bEndpointAddress=0x81)
