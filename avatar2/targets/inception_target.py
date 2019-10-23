@@ -20,8 +20,8 @@ class InceptionTarget(Target):
         self._device_vendor_id = device_vendor_id
 
     def init(self):
-        inception = InceptionProtocol(self._device_vendor_id,
-                                self._device_product_id,
+        inception = InceptionProtocol(device_vendor_id=self._device_vendor_id,
+                                device_product_id=self._device_product_id,
                                 output_directory=self.avatar.output_directory)
 
         if inception.connect():
