@@ -81,9 +81,9 @@ class InceptionProtocol(object):
             self.log.error('Failed to connect to Inception-debugger')
             raise ConnectionRefusedError("Inception-debugger is not connected")
 
-        self._device.reset();
+        #self._device.reset();
 
-        self._device.set_configuration()
+        #self._device.set_configuration()
 
         # # get an endpoint instance
         # cfg = self._device.get_active_configuration()
