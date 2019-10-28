@@ -127,36 +127,23 @@ class InceptionProtocol(object):
         # self._ep_out.write(''.join('{:02x}'.format(x) for x in data))
         self._ep_out.write(bytearray.fromhex(data))
 
-        #res = self.read_memory(0xE0002000, 4)
-        #FP_CTRL = struct.unpack_from(">I", res, 0)[0]
-        #print('FP_CTRL before write = %s' % FP_CTRL)
-
-        # Enable breakpoints
+        # Enable the FlashPatch module : breakpoint
+        # FlashPatch Control Register (FP_CTRL)
         self.write_memory(0xE0002000, 4, 3)
 
         # Now we need to retrive the number of supporter hw bkpt from the core
         res = self.read_memory(0xE0002000, 4)
         FP_CTRL = struct.unpack_from(">I", res, 0)[0]
-        #print('FP_CTRL after write  = %s' % FP_CTRL)
-
-        # bit [11:8] are the number of supported comparators
-        #self._bkpt_limit = (FP_CTRL >> 8) & 0xF
 
 	# bits [7:4] are number of code slots field
         self._bkpt_limit = (FP_CTRL >> 4) & 0xF
-        self.log.debug(("Number of available breakpoints %d") % (self._bkpt_limit))
-        print(("Number of available breakpoints %d") % (self._bkpt_limit))
+        self.log.debug(("Number of available breakpoints read %d") % (self._bkpt_limit))
 
-
-        w = (FP_CTRL >> 8) & 0xF
-        print("Nb watchpoint %s" % w)
+        # Watchpoint are located @ bits [11:8]
+        #w = (FP_CTRL >> 8) & 0xF
 
         # bkpt list contains status of hw bkpt (enabled/disabled)
         self._bkpt_list = [0] * self._bkpt_limit
-
-        # enable the FlashPatch module : breakpoint
-        # FlashPatch Control Register (FP_CTRL)
-        #self.write_memory(0xE0002000, 4, 1)
 
         return True
 
@@ -174,16 +161,36 @@ class InceptionProtocol(object):
         Continues the execution of the target
         :returns: True on success
         """
+
+        # Write C_HALT bit in the DHCSR register.
         self.write_memory(0xE000EDF0, 4, (0xA05F << 16) | (0<<1) | (1 << 0))
 
         self._debug_enabled = False
+        return True
+
+    def wait(self):
+        """
+        Wait ...
+        :returns: True on success
+        """
+
+        halt = False
+
+        while (not halt):
+            res = self.read_memory(0xE000EDF0, 4)
+            DHCSR = struct.unpack_from(">I", res, 0)[0]
+            # Check the C_HALT bit in the DHCSR register.
+            if (DHCSR & 0x2):
+                halt = True
+
+        print('waiting inception return..')
         return True
 
     def stop(self):
         """
         Stops the execution of the target
         """
-        write_memory(self, 0xE0002000, 4, (0xA05F << 16) | (1<<1) | (1 << 0))
+        self.write_memory(0xE0002000, 4, (0xA05F << 16) | (1<<1) | (1 << 0))
 
         self._debug_enabled = False
         return True
