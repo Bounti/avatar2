@@ -74,21 +74,26 @@ class InceptionProtocol(object):
         returns: True on success, else False
         """
 
-        self._device = usb.core.find(idVendor=0x04b4,
-                idProduct=0x00f1)
-
-        self._device.reset();
+        self._device = usb.core.find(idVendor=self._device_vendor_id,
+                idProduct=self._device_product_id)
 
         if self._device is None:
             self.log.error('Failed to connect to Inception-debugger')
             raise ConnectionRefusedError("Inception-debugger is not connected")
 
-        self._device.set_configuration()
+        try:
+            self._device.set_configuration()
+            self._device.reset()
+        except usb.core.USBError as e:
+            raise ConnectionRefusedError("Could not set configuration: %s" % str(e))
 
         # # get an endpoint instance
         # cfg = self._device.get_active_configuration()
         # intf = cfg[(0,0)]
         intf = self._device[0][(0,0)]
+
+        if self._device.is_kernel_driver_active(0):
+          self._device.detach_kernel_driver(0)
 
         self._ep_out = usb.util.find_descriptor(intf, bEndpointAddress=0x01)
 
