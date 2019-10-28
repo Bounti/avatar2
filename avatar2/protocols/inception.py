@@ -122,21 +122,36 @@ class InceptionProtocol(object):
         # self._ep_out.write(''.join('{:02x}'.format(x) for x in data))
         self._ep_out.write(bytearray.fromhex(data))
 
+        #res = self.read_memory(0xE0002000, 4)
+        #FP_CTRL = struct.unpack_from(">I", res, 0)[0]
+        #print('FP_CTRL before write = %s' % FP_CTRL)
+
+        # Enable breakpoints
+        self.write_memory(0xE0002000, 4, 3)
+
         # Now we need to retrive the number of supporter hw bkpt from the core
         res = self.read_memory(0xE0002000, 4)
-        FP_CTRL = struct.unpack_from("I", res, 0)[0]
+        FP_CTRL = struct.unpack_from(">I", res, 0)[0]
+        #print('FP_CTRL after write  = %s' % FP_CTRL)
 
         # bit [11:8] are the number of supported comparators
-        self._bkpt_limit = (FP_CTRL >> 8) & 0xF
+        #self._bkpt_limit = (FP_CTRL >> 8) & 0xF
+
+	# bits [7:4] are number of code slots field
+        self._bkpt_limit = (FP_CTRL >> 4) & 0xF
         self.log.debug(("Number of available breakpoints %d") % (self._bkpt_limit))
         print(("Number of available breakpoints %d") % (self._bkpt_limit))
+
+
+        w = (FP_CTRL >> 8) & 0xF
+        print("Nb watchpoint %s" % w)
 
         # bkpt list contains status of hw bkpt (enabled/disabled)
         self._bkpt_list = [0] * self._bkpt_limit
 
         # enable the FlashPatch module : breakpoint
         # FlashPatch Control Register (FP_CTRL)
-        self.write_memory(0xE0002000, 4, 1)
+        #self.write_memory(0xE0002000, 4, 1)
 
         return True
 
@@ -188,7 +203,7 @@ class InceptionProtocol(object):
 
         :param address:   The address from where the memory-write should
                           start
-        :param size:      The size of the memory write
+        :param size:      The size of the memory write in bytes
         :param value:     The actual value written to memory
         :type val:        int if num_words == 1 and raw == False
                           list if num_words > 1 and raw == False
@@ -204,23 +219,25 @@ class InceptionProtocol(object):
         data = ctypes.create_string_buffer(12)
 
         # Top level command
-        struct.pack_into(">i", data, 0, command)
+        struct.pack_into(">I", data, 0, command)
+
 
         if size <= 4:
             struct.pack_into(">I", data, 4, address)
             struct.pack_into(">I", data, 8, value)
             self._ep_out.write(data)
-        else:
+
+        elif size <= 340:
             i = 0
             while i < size:
                 packet = data
 
                 struct.pack_into(">I", data, 4, address+ (4*i))
 
-                struct.pack_into(">c", data, 8, value[0+i].encode())
-                struct.pack_into(">c", data, 9, value[1+i].encode())
-                struct.pack_into(">c", data, 10, value[2+i].encode())
-                struct.pack_into(">c", data, 11, value[3+i].encode())
+                struct.pack_into(">I", data, 8, value[0+i].encode())
+                struct.pack_into(">I", data, 9, value[1+i].encode())
+                struct.pack_into(">I", data, 10, value[2+i].encode())
+                struct.pack_into(">I", data, 11, value[3+i].encode())
 
                 # print("Sending packet from "+str(i)+" to "+str(i+4))
                 # for field in data:
@@ -229,6 +246,9 @@ class InceptionProtocol(object):
                 self._ep_out.write(packet)
 
                 i = i + 4
+        else:
+            raise Exception("The memory write cannot be encapsulate in multiple USB packets.")
+
         return True
 
     def read_memory(self, address, size, words=1, raw=False):
@@ -306,7 +326,7 @@ class InceptionProtocol(object):
 
         return self.read_memory(0xE000EDF8, 4)
 
-    def set_breakpoint(self, line, hardware=False, temporary=False, regex=False,
+    def set_breakpoint(self, address, hardware=False, temporary=False, regex=False,
                        condition=None, ignore_count=0, thread=0, **kwargs):
         """Inserts a breakpoint
 
@@ -321,17 +341,17 @@ class InceptionProtocol(object):
         indexes = [i for i, j in enumerate(self._bkpt_list) if j == 0]
 
         # If no bkpt are available, raise an exception
-        if indexes is None:
+        if indexes == []:
             raise Exception("Breakpoint limitation reaches")
 
         # Compute a free comparator register address
         FPCRegAddress = 0xE0002008 + ( indexes[0] * 4 )
 
         #set the flash patch comparator register value (FP_COMPx)
-        FPCRegValue = b'0'
-        FPCRegValue += b'0x11' << 30 # Breakpoint on match
+        FPCRegValue = 0
+        FPCRegValue += 0b11 << 30 # Breakpoint on match
         FPCRegValue += address << 2 # Address to compare against
-        FPCRegValue += b'0x11' # Enable the comparator
+        FPCRegValue += 0b11 # Enable the comparator
 
         self.write_memory(FPCRegAddress, 4, FPCRegValue)
 
