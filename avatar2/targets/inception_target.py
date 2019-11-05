@@ -12,20 +12,30 @@ from avatar2.protocols.inception import InceptionProtocol
 from ..watchmen import watch
 
 class InceptionTarget(Target):
-    def __init__(self, avatar, device_vendor_id=0x04b4,
+    def __init__(self, avatar, 
+                 processor='cortexM3',
+                 device_vendor_id=0x04b4,
                  device_product_id=0x00f1,
                  **kwargs):
 
         super(InceptionTarget, self).__init__(avatar, **kwargs)
 
+        self.processor = processor
         self._device_product_id = device_product_id
         self._device_vendor_id = device_vendor_id
 
     @watch('TargetInit')
     def init(self):
-        inception = InceptionProtocol(device_vendor_id=self._device_vendor_id,
-                                device_product_id=self._device_product_id,
-                                output_directory=self.avatar.output_directory)
+
+        if self.processor == 'cortexM3':
+            inception = IPCortexM3(avatar=self.avatar, origin=self,
+                    device_vendor_id=self._device_vendor_id,
+                    device_product_id=self._device_product_id, 
+                    output_directory=self.avatar.output_directory)
+        else:
+            inception = None
+            self.log.warning("Target board not implemented")
+
 
         if inception.connect():
             inception.reset()
@@ -36,12 +46,12 @@ class InceptionTarget(Target):
             return False
 
         if inception.stop():
-          self.update_state(TargetStates.STOPPED)
+            self.update_state(TargetStates.STOPPED)
 
         self.protocols.set_all(inception)
         self.protocols.monitor = inception 
         
-        self.wait()
+        #self.wait()
 
     def reset(self, halt=True):
         self.protocols.execution.reset(halt=halt)
